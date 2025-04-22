@@ -8,7 +8,7 @@ from datetime import datetime
 
 def scraper_concours():
     group_id = "1509372826257136"
-    pages = 5
+    pages = 10
     fichier_csv = "concours_palet.csv"
 
     heure_regex = r"\b(\d{1,2}h(?:\d{2})?)\b"
