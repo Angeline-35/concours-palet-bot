@@ -68,6 +68,10 @@ for post in get_posts(group=GROUP_ID, pages=PAGES_TO_SCRAPE, options={"comments"
     if post.get("images"):
         for url in post["images"]:
             full_text += "\n" + extract_text_from_image_url(url)
+        print("="*60)
+        print("TEXTE DU FLYER DÉTECTÉ :")
+        print(full_text)
+        print("="*60)
 
     infos = extract_concours_info(full_text)
 
