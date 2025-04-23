@@ -1,112 +1,48 @@
-import pandas as pd
-import pytesseract
-from PIL import Image
-from facebook_scraper import get_posts
-from datetime import datetime
 import re
-import requests
-from io import BytesIO
-import os
+from datetime import datetime
+import pandas as pd
 
-# 🔧 Config
-GROUP_ID = "1509372826257136"
-CSV_FILE = "concours_palet.csv"
-PAGES_TO_SCRAPE = 3
-
-# 🧠 Expressions régulières pour extraire infos
-date_pattern = r"(?:le\s*)?(\d{1,2}[\/\-\.\s]?(?:\d{1,2})?[\/\-\.\s]?\d{2,4})"
-heure_pattern = r"(\d{1,2}h\d{0,2})"
-lieu_pattern = r"(?:à|au|chez)\s+([A-ZÉÈÀA-Za-z\s\-']{3,})"
-
-def extract_text_from_image_url(url):
-    try:
-        response = requests.get(url)
-        img = Image.open(BytesIO(response.content)).convert("RGB")
-        text = pytesseract.image_to_string(img, lang='fra')
-        return text
-    except Exception as e:
-        print(f"[OCR] Erreur image : {e}")
-        return ""
-
+# Fonction d'extraction
 def extract_concours_info(text):
     infos = {}
-    date_match = re.search(date_pattern, text, re.IGNORECASE)
-    heure_match = re.search(heure_pattern, text)
-    lieu_match = re.search(lieu_pattern, text, re.IGNORECASE)
 
+    date_match = re.search(r"(\d{1,2})\s*(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s*(20\d{2})", text, re.IGNORECASE)
     if date_match:
-        try:
-            raw_date = date_match.group(1).replace(" ", "/").replace(".", "/").replace("-", "/")
-            parsed_date = datetime.strptime(raw_date, "%d/%m/%Y")
-            infos["Date"] = parsed_date.strftime("%Y-%m-%d")
-        except:
-            try:
-                parsed_date = datetime.strptime(raw_date, "%d/%m")
-                infos["Date"] = parsed_date.replace(year=datetime.now().year).strftime("%Y-%m-%d")
-            except:
-                pass
+        jours = {
+            "janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
+            "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12
+        }
+        jour = int(date_match.group(1))
+        mois = jours[date_match.group(2).lower()]
+        annee = int(date_match.group(3))
+        infos["Date"] = datetime(annee, mois, jour).strftime("%Y-%m-%d")
+
+    heure_match = re.search(r"(\d{1,2})h(\d{0,2})", text)
     if heure_match:
-        infos["Heure"] = heure_match.group(1).replace("h", ":")
+        h = heure_match.group(1)
+        m = heure_match.group(2) if heure_match.group(2) else "00"
+        infos["Heure"] = f"{h}:{m}"
+
+    lieu_match = re.search(r"(?:à|lieu\s*[:\-]?)\s*([A-ZÉÈÀA-Za-z\s\-']{3,})", text, re.IGNORECASE)
     if lieu_match:
         infos["Lieu"] = lieu_match.group(1).strip()
 
     return infos if "Date" in infos else {}
 
-#TEST
+# Test manuel
 test_text = """
 Concours de palet – samedi 27 avril 2024 à 14h
 Lieu : Salle polyvalente de Plélan-le-Grand
 """
 
 print("Test détection concours :")
-print(extract_concours_info(test_text))
+infos = extract_concours_info(test_text)
+print(infos)
 
-# 📥 Charger les concours existants
-if os.path.exists(CSV_FILE):
-    df = pd.read_csv(CSV_FILE)
+# Sauvegarde dans le fichier CSV si les infos sont valides
+if infos:
+    df = pd.DataFrame([infos])
+    df.to_csv("concours_palet.csv", index=False)
+    print("Écrit dans concours_palet.csv")
 else:
-    df = pd.DataFrame(columns=["Date", "Heure", "Lieu"])
-
-# 🔄 Scraping des publications
-nouveaux_concours = []
-
-for post in get_posts(group=GROUP_ID, pages=PAGES_TO_SCRAPE, options={"comments": False}):
-    full_text = post.get("text", "") or ""
-    
-    # 🔎 Ajout du texte OCR des images
-    if post.get("images"):
-        for url in post["images"]:
-            full_text += "\n" + extract_text_from_image_url(url)
-        print("="*60)
-        print("TEXTE DU FLYER DÉTECTÉ :")
-        print(full_text)
-        print("="*60)
-
-    infos = extract_concours_info(full_text)
-
-    if infos and infos["Date"] >= datetime.now().strftime("%Y-%m-%d"):
-        if not (
-            ((df["Date"] == infos.get("Date")) & (df["Lieu"] == infos.get("Lieu"))).any()
-        ):
-            nouveaux_concours.append(infos)
-
-# ➕ Fusionner et nettoyer
-if nouveaux_concours:
-    df = pd.concat([df, pd.DataFrame(nouveaux_concours)], ignore_index=True)
-
-# 🧹 Supprimer les concours passés
-aujourdhui = datetime.now().strftime("%Y-%m-%d")
-df = df[df["Date"] >= aujourdhui]
-
-# 📅 Trier par date
-df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d")
-df = df.sort_values("Date").reset_index(drop=True)
-df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
-
-# 💾 Enregistrer
-df.to_csv(CSV_FILE, index=False)
-
-print(f"{len(nouveaux_concours)} nouveaux concours ajoutés.")
-
-df = pd.DataFrame([extract_concours_info(test_text)])
-df.to_csv("concours_palet.csv", index=False)
+    print("Aucune info détectée – rien à écrire.")
