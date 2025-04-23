@@ -6,6 +6,22 @@ import re
 import os
 from datetime import datetime
 
+import pytesseract
+from PIL import Image
+import requests
+from io import BytesIO
+import re
+
+def extract_text_from_image_url(url):
+    try:
+        response = requests.get(url)
+        img = Image.open(BytesIO(response.content)).convert("RGB")
+        text = pytesseract.image_to_string(img, lang='fra')  # "fra" pour le français
+        return text
+    except Exception as e:
+        print(f"[OCR] Erreur lors de l’analyse de l’image : {e}")
+        return ""
+
 def scraper_concours():
     group_id = "1509372826257136"
     pages = 10
@@ -26,9 +42,17 @@ def scraper_concours():
     for post in get_posts(group=group_id, pages=pages):
         texte = post.get('text', '').lower()
         post_url = post.get('post_url')
-
+        
         if post_url in anciens_urls:
             continue
+            
+        # OCR sur images si le texte du post ne contient rien d’utile
+        if not contains_concours_info(texte) and post.get("images"):
+            for image_url in post["images"]:
+                texte += "\n" + extract_text_from_image_url(image_url)
+    
+        # Puis analyse du texte (OCR ou post) comme d’habitude...
+
 
         if "palet" in texte and ("concours" in texte or "tournoi" in texte):
             heure_trouvee = None
@@ -73,18 +97,4 @@ def scraper_concours():
 if __name__ == "__main__":
     scraper_concours()
 
-import pytesseract
-from PIL import Image
-import requests
-from io import BytesIO
-import re
 
-def extract_text_from_image_url(url):
-    try:
-        response = requests.get(url)
-        img = Image.open(BytesIO(response.content)).convert("RGB")
-        text = pytesseract.image_to_string(img, lang='fra')  # "fra" pour le français
-        return text
-    except Exception as e:
-        print(f"[OCR] Erreur lors de l’analyse de l’image : {e}")
-        return ""
