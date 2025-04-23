@@ -1,100 +1,96 @@
-# scrape_concours.py
-
-from facebook_scraper import get_posts
 import pandas as pd
-import re
-import os
-from datetime import datetime
-
 import pytesseract
 from PIL import Image
+from facebook_scraper import get_posts
+from datetime import datetime
+import re
 import requests
 from io import BytesIO
-import re
+import os
+
+# 🔧 Config
+GROUP_ID = "1509372826257136"
+CSV_FILE = "concours_palet.csv"
+PAGES_TO_SCRAPE = 3
+
+# 🧠 Expressions régulières pour extraire infos
+date_pattern = r"(?:le\s*)?(\d{1,2}[\/\-\.\s]?(?:\d{1,2})?[\/\-\.\s]?\d{2,4})"
+heure_pattern = r"(\d{1,2}h\d{0,2})"
+lieu_pattern = r"(?:à|au|chez)\s+([A-ZÉÈÀA-Za-z\s\-']{3,})"
 
 def extract_text_from_image_url(url):
     try:
         response = requests.get(url)
         img = Image.open(BytesIO(response.content)).convert("RGB")
-        text = pytesseract.image_to_string(img, lang='fra')  # "fra" pour le français
+        text = pytesseract.image_to_string(img, lang='fra')
         return text
     except Exception as e:
-        print(f"[OCR] Erreur lors de l’analyse de l’image : {e}")
+        print(f"[OCR] Erreur image : {e}")
         return ""
 
-def scraper_concours():
-    group_id = "1509372826257136"
-    pages = 10
-    fichier_csv = "concours_palet.csv"
+def extract_concours_info(text):
+    infos = {}
+    date_match = re.search(date_pattern, text, re.IGNORECASE)
+    heure_match = re.search(heure_pattern, text)
+    lieu_match = re.search(lieu_pattern, text, re.IGNORECASE)
 
-    heure_regex = r"\b(\d{1,2}h(?:\d{2})?)\b"
-    lieu_regex = r"à\s+([A-ZÉÈÀa-zçêôâîùûéè'’\- ]+)"
+    if date_match:
+        try:
+            raw_date = date_match.group(1).replace(" ", "/").replace(".", "/").replace("-", "/")
+            parsed_date = datetime.strptime(raw_date, "%d/%m/%Y")
+            infos["Date"] = parsed_date.strftime("%Y-%m-%d")
+        except:
+            try:
+                parsed_date = datetime.strptime(raw_date, "%d/%m")
+                infos["Date"] = parsed_date.replace(year=datetime.now().year).strftime("%Y-%m-%d")
+            except:
+                pass
+    if heure_match:
+        infos["Heure"] = heure_match.group(1).replace("h", ":")
+    if lieu_match:
+        infos["Lieu"] = lieu_match.group(1).strip()
+
+    return infos if "Date" in infos else {}
+
+# 📥 Charger les concours existants
+if os.path.exists(CSV_FILE):
+    df = pd.read_csv(CSV_FILE)
+else:
+    df = pd.DataFrame(columns=["Date", "Heure", "Lieu"])
+
+# 🔄 Scraping des publications
+nouveaux_concours = []
+
+for post in get_posts(group=GROUP_ID, pages=PAGES_TO_SCRAPE, options={"comments": False}):
+    full_text = post.get("text", "") or ""
     
-    concours = []
+    # 🔎 Ajout du texte OCR des images
+    if post.get("images"):
+        for url in post["images"]:
+            full_text += "\n" + extract_text_from_image_url(url)
 
-    if os.path.exists(fichier_csv):
-        df_ancien = pd.read_csv(fichier_csv)
-        anciens_urls = set(df_ancien["Lien du post"])
-    else:
-        df_ancien = pd.DataFrame()
-        anciens_urls = set()
+    infos = extract_concours_info(full_text)
 
-    for post in get_posts(group=group_id, pages=pages):
-        texte = post.get('text', '').lower()
-        post_url = post.get('post_url')
-        
-        if post_url in anciens_urls:
-            continue
-            
-        # OCR sur images si le texte du post ne contient rien d’utile
-        if not contains_concours_info(texte) and post.get("images"):
-            for image_url in post["images"]:
-                texte += "\n" + extract_text_from_image_url(image_url)
-    
-        # Puis analyse du texte (OCR ou post) comme d’habitude...
+    if infos and infos["Date"] >= datetime.now().strftime("%Y-%m-%d"):
+        if not (
+            ((df["Date"] == infos.get("Date")) & (df["Lieu"] == infos.get("Lieu"))).any()
+        ):
+            nouveaux_concours.append(infos)
 
+# ➕ Fusionner et nettoyer
+if nouveaux_concours:
+    df = pd.concat([df, pd.DataFrame(nouveaux_concours)], ignore_index=True)
 
-        if "palet" in texte and ("concours" in texte or "tournoi" in texte):
-            heure_trouvee = None
-            lieu_trouve = None
-            date_post = post.get("time")
+# 🧹 Supprimer les concours passés
+aujourdhui = datetime.now().strftime("%Y-%m-%d")
+df = df[df["Date"] >= aujourdhui]
 
-            heures = re.findall(heure_regex, texte)
-            if heures:
-                heure_trouvee = heures[0]
+# 📅 Trier par date
+df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d")
+df = df.sort_values("Date").reset_index(drop=True)
+df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
 
-            lieux = re.findall(lieu_regex, texte)
-            if lieux:
-                lieu_trouve = lieux[0]
+# 💾 Enregistrer
+df.to_csv(CSV_FILE, index=False)
 
-            date_complete = date_post.strftime("%d/%m/%Y") if date_post else None
-
-            concours.append({
-                "Date": date_complete,
-                "Heure": heure_trouvee,
-                "Lieu": lieu_trouve,
-                "Texte complet": post.get('text'),
-                "Lien du post": post_url
-            })
-
-    if concours:
-        df_nouveaux = pd.DataFrame(concours)
-        df_total = pd.concat([df_ancien, df_nouveaux], ignore_index=True)
-        df_total = df_total.drop_duplicates(subset=["Lien du post"])
-
-        # Nettoyage : suppression concours passés
-        df_total["Date"] = pd.to_datetime(df_total["Date"], format="%d/%m/%Y", errors='coerce')
-        aujourdhui = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
-        df_total = df_total[df_total["Date"] >= aujourdhui]
-        df_total = df_total.sort_values(by="Date")
-        df_total["Date"] = df_total["Date"].dt.strftime("%d/%m/%Y")
-
-        df_total.to_csv(fichier_csv, index=False, encoding='utf-8-sig')
-        print(f"{len(df_nouveaux)} nouveau(x) concours ajouté(s).")
-    else:
-        print("Aucun nouveau concours trouvé.")
-
-if __name__ == "__main__":
-    scraper_concours()
-
-
+print(f"{len(nouveaux_concours)} nouveaux concours ajoutés.")
