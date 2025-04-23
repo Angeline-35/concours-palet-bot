@@ -72,3 +72,19 @@ def scraper_concours():
 
 if __name__ == "__main__":
     scraper_concours()
+
+import pytesseract
+from PIL import Image
+import requests
+from io import BytesIO
+import re
+
+def extract_text_from_image_url(url):
+    try:
+        response = requests.get(url)
+        img = Image.open(BytesIO(response.content)).convert("RGB")
+        text = pytesseract.image_to_string(img, lang='fra')  # "fra" pour le français
+        return text
+    except Exception as e:
+        print(f"[OCR] Erreur lors de l’analyse de l’image : {e}")
+        return ""
