@@ -1,5 +1,3 @@
-from extract_utils import extract_concours_info  # si c’est dans un autre fichier, sinon garde ta fonction
-
 test_text = """
 Concours de palet – samedi 27 avril 2024 à 14h
 Lieu : Salle polyvalente de Plélan-le-Grand
