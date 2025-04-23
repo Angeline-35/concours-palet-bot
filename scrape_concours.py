@@ -97,4 +97,9 @@ df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
 # 💾 Enregistrer
 df.to_csv(CSV_FILE, index=False)
 
+TEST 
+test_text = "Concours de palet – samedi 27 avril 2024 à 14h à Plélan-le-Grand"
+infos = extract_concours_info(test_text)
+print("Infos détectées :", infos)
+
 print(f"{len(nouveaux_concours)} nouveaux concours ajoutés.")
