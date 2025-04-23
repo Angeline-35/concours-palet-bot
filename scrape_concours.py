@@ -1,11 +1,3 @@
-test_text = """
-Concours de palet – samedi 27 avril 2024 à 14h
-Lieu : Salle polyvalente de Plélan-le-Grand
-"""
-
-print("Test détection concours :")
-print(extract_concours_info(test_text))
-
 import pandas as pd
 import pytesseract
 from PIL import Image
@@ -59,6 +51,15 @@ def extract_concours_info(text):
         infos["Lieu"] = lieu_match.group(1).strip()
 
     return infos if "Date" in infos else {}
+
+#TEST
+test_text = """
+Concours de palet – samedi 27 avril 2024 à 14h
+Lieu : Salle polyvalente de Plélan-le-Grand
+"""
+
+print("Test détection concours :")
+print(extract_concours_info(test_text))
 
 # 📥 Charger les concours existants
 if os.path.exists(CSV_FILE):
