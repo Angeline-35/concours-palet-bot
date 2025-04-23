@@ -35,7 +35,7 @@ jobs:
           git config --global user.email "actions@github.com"
           if [ -f concours_palet.csv ]; then
             git add concours_palet.csv
-            git commit -m "Mise à jour automatique des concours"
+            git commit -m "Mise à jour automatique des concours" || true
             git push
           else
             echo "Aucun fichier concours_palet.csv à committer"
