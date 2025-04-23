@@ -8,37 +8,6 @@ import numpy as np
 from datetime import datetime
 from PIL import Image
 from facebook_scraper import get_posts
-###
-# 👇 Test OCR manuel sur un flyer
-def test_flyer_ocr():
-    flyer_url = "https://scontent.xx.fbcdn.net/v/t39.30808-6/441181134_2019829378544809_7314485221197299128_n.jpg"
-    print("\n🧪 Test OCR sur flyer d'exemple...\n")
-    ocr_text = extract_text_from_image(flyer_url)
-    print("🧠 Texte OCR détecté :\n", ocr_text)
-    infos = extract_concours_info(ocr_text)
-    if infos:
-        print("✅ Infos détectées :", infos)
-        return infos
-    else:
-        print("❌ Aucune info détectée.")
-        return {}
-
-# Lancer le test OCR flyer avant tout le reste
-infos_flyer = test_flyer_ocr()
-if infos_flyer:
-    if os.path.exists(csv_path):
-        df = pd.read_csv(csv_path)
-    else:
-        df = pd.DataFrame(columns=["Date", "Heure", "Lieu"])
-
-    aujourd_hui = datetime.now().strftime("%Y-%m-%d")
-    if not ((df["Date"] == infos_flyer["Date"]) & (df["Heure"] == infos_flyer["Heure"])).any():
-        df = pd.concat([df, pd.DataFrame([infos_flyer])], ignore_index=True)
-        df = df[df["Date"] >= aujourd_hui]
-        df = df.sort_values(by="Date")
-        df.to_csv(csv_path, index=False)
-        print("💾 Fichier mis à jour avec le flyer.")
-###
 
 # 🔍 Extraire le texte depuis une image via URL (OCR)
 def extract_text_from_image(url):
@@ -85,6 +54,40 @@ if os.path.exists(csv_path):
     df = pd.read_csv(csv_path)
 else:
     df = pd.DataFrame(columns=["Date", "Heure", "Lieu"])
+
+
+###
+# 👇 Test OCR manuel sur un flyer
+def test_flyer_ocr():
+    flyer_url = "https://scontent.xx.fbcdn.net/v/t39.30808-6/441181134_2019829378544809_7314485221197299128_n.jpg"
+    print("\n🧪 Test OCR sur flyer d'exemple...\n")
+    ocr_text = extract_text_from_image(flyer_url)
+    print("🧠 Texte OCR détecté :\n", ocr_text)
+    infos = extract_concours_info(ocr_text)
+    if infos:
+        print("✅ Infos détectées :", infos)
+        return infos
+    else:
+        print("❌ Aucune info détectée.")
+        return {}
+
+# Lancer le test OCR flyer avant tout le reste
+infos_flyer = test_flyer_ocr()
+if infos_flyer:
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path)
+    else:
+        df = pd.DataFrame(columns=["Date", "Heure", "Lieu"])
+
+    aujourd_hui = datetime.now().strftime("%Y-%m-%d")
+    if not ((df["Date"] == infos_flyer["Date"]) & (df["Heure"] == infos_flyer["Heure"])).any():
+        df = pd.concat([df, pd.DataFrame([infos_flyer])], ignore_index=True)
+        df = df[df["Date"] >= aujourd_hui]
+        df = df.sort_values(by="Date")
+        df.to_csv(csv_path, index=False)
+        print("💾 Fichier mis à jour avec le flyer.")
+###
+
 
 # 🔁 Récupération des publications du groupe Facebook
 for post in get_posts(group="1509372826257136", pages=3):
