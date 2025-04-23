@@ -1,3 +1,13 @@
+from extract_utils import extract_concours_info  # si c’est dans un autre fichier, sinon garde ta fonction
+
+test_text = """
+Concours de palet – samedi 27 avril 2024 à 14h
+Lieu : Salle polyvalente de Plélan-le-Grand
+"""
+
+print("Test détection concours :")
+print(extract_concours_info(test_text))
+
 import pandas as pd
 import pytesseract
 from PIL import Image
@@ -97,9 +107,7 @@ df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
 # 💾 Enregistrer
 df.to_csv(CSV_FILE, index=False)
 
-# TEST 
-test_text = "Concours de palet – samedi 27 avril 2024 à 14h à Plélan-le-Grand"
-infos = extract_concours_info(test_text)
-print("Infos détectées :", infos)
-
 print(f"{len(nouveaux_concours)} nouveaux concours ajoutés.")
+
+df = pd.DataFrame([extract_concours_info(test_text)])
+df.to_csv("concours_palet.csv", index=False)
