@@ -23,10 +23,15 @@ jobs:
       - name: Run scraper
         run: python scrape_concours.py
 
-      - name: Commit and push CSV
+      - name: Commit and push CSV if exists
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git add concours_palet.csv
-          git commit -m "Mise à jour automatique des concours"
-          git push
+          if [ -f concours_palet.csv ]; then
+            git add concours_palet.csv
+            git commit -m "Mise à jour automatique des concours"
+            git push
+          else
+            echo "Aucun fichier concours_palet.csv à committer"
+          fi
+
