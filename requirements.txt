@@ -1,6 +1,6 @@
 facebook-scraper
 pandas
-lxml_html_clean
 pytesseract
 pillow
 opencv-python
+lxml_html_clean
