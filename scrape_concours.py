@@ -90,7 +90,7 @@ if infos_flyer:
 
 
 # 🔁 Récupération des publications du groupe Facebook
-for post in get_posts(group="1509372826257136", pages=3):
+for post in get_posts(group="61554949372064", pages=3):
     text = post.get("text", "")
     infos = extract_concours_info(text)
 
@@ -108,6 +108,11 @@ for post in get_posts(group="1509372826257136", pages=3):
     if infos and not ((df["Date"] == infos["Date"]) & (df["Heure"] == infos["Heure"])).any():
         print("✅ Nouveau concours détecté :", infos)
         df = pd.concat([df, pd.DataFrame([infos])], ignore_index=True)
+
+#  Afficher le nombre de posts détectés
+posts = list(get_posts(group=GROUP_ID, cookies="cookies.json", pages=1))
+print(f"🔍 {len(posts)} publication(s) trouvée(s) dans le groupe.")
+
 
 # 🧹 Supprimer les concours passés
 aujourd_hui = datetime.now().strftime("%Y-%m-%d")
