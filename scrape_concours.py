@@ -95,16 +95,18 @@ def main():
         if infos and not ((df["Date"] == infos["Date"]) & (df["Heure"] == infos["Heure"])).any():
             print("✅ Nouveau concours détecté :", infos)
             df.loc[len(df)] = infos
-
+       
+        print("Texte brut analysé :", text)
+        print("Infos extraites du texte :", infos)
+        print("Images trouvées :", post.get("images", []))
+        print("Infos extraites des images :", infos)
+        
     # 🧹 Nettoyage + sauvegarde
     aujourd_hui = datetime.now().strftime("%Y-%m-%d")
     df = df[df["Date"] >= aujourd_hui].sort_values(by="Date")
     df.to_csv(csv_path, index=False)
 
-    print("Texte brut analysé :", text)
-    print("Infos extraites du texte :", infos)
-    print("Images trouvées :", post.get("images", []))
-    print("Infos extraites des images :", infos)
+   
     print(f"✅ {len(df)} concours à venir enregistrés dans : {csv_path}")
 
 if __name__ == "__main__":
