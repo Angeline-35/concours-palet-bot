@@ -9,6 +9,9 @@ from datetime import datetime
 from PIL import Image
 from facebook_scraper import get_posts
 
+PAGE_ID = "61554949372064"
+
+
 # 🔍 Extraire le texte depuis une image via URL (OCR)
 def extract_text_from_image(url):
     try:
@@ -90,7 +93,7 @@ if infos_flyer:
 
 
 # 🔁 Récupération des publications du groupe Facebook
-for post in get_posts(group="61554949372064", pages=3):
+for post in get_posts(PAGE_ID, pages=3):
     text = post.get("text", "")
     infos = extract_concours_info(text)
 
@@ -110,7 +113,7 @@ for post in get_posts(group="61554949372064", pages=3):
         df = pd.concat([df, pd.DataFrame([infos])], ignore_index=True)
 
 #  Afficher le nombre de posts détectés
-posts = list(get_posts(group=GROUP_ID, cookies="cookies.json", pages=1))
+posts = list(get_posts(PAGE_ID, pages=1))
 print(f"🔍 {len(posts)} publication(s) trouvée(s) dans le groupe.")
 
 
