@@ -10,9 +10,9 @@ from PIL import Image
 from facebook_scraper import get_posts
 
 PAGE_ID = "61554949372064"
+csv_path = "concours_palet.csv"
 
-
-# 🔍 Extraire le texte depuis une image via URL (OCR)
+# 🔍 OCR depuis URL d'image
 def extract_text_from_image(url):
     try:
         response = requests.get(url, stream=True)
@@ -24,7 +24,7 @@ def extract_text_from_image(url):
         print("Erreur OCR :", e)
         return ""
 
-# 📌 Extraction d'infos depuis un texte (publication ou OCR)
+# 📌 Extraire date/heure/lieu d'un texte
 def extract_concours_info(text):
     infos = {}
 
@@ -51,16 +51,7 @@ def extract_concours_info(text):
 
     return infos if "Date" in infos else {}
 
-# 📂 Chargement du fichier CSV s'il existe
-csv_path = "concours_palet.csv"
-if os.path.exists(csv_path):
-    df = pd.read_csv(csv_path)
-else:
-    df = pd.DataFrame(columns=["Date", "Heure", "Lieu"])
-
-
-###
-# 👇 Test OCR manuel sur un flyer
+# 🧪 Test OCR sur un flyer
 def test_flyer_ocr():
     flyer_url = "https://scontent.xx.fbcdn.net/v/t39.30808-6/441181134_2019829378544809_7314485221197299128_n.jpg"
     print("\n🧪 Test OCR sur flyer d'exemple...\n")
@@ -74,54 +65,43 @@ def test_flyer_ocr():
         print("❌ Aucune info détectée.")
         return {}
 
-# Lancer le test OCR flyer avant tout le reste
-infos_flyer = test_flyer_ocr()
-if infos_flyer:
+# 🚀 Script principal
+def main():
+    # Charger fichier CSV
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
     else:
         df = pd.DataFrame(columns=["Date", "Heure", "Lieu"])
 
+    # 🧪 Test OCR
+    infos_flyer = test_flyer_ocr()
+    if infos_flyer and not ((df["Date"] == infos_flyer["Date"]) & (df["Heure"] == infos_flyer["Heure"])).any():
+        df.loc[len(df)] = infos_flyer
+
+    # 🔁 Parcourir publications Facebook
+    for post in get_posts(PAGE_ID, pages=3):
+        text = post.get("text", "")
+        infos = extract_concours_info(text)
+
+        if not infos:
+            images = post.get("images", [])
+            for img_url in images:
+                print(f"Analyse OCR image : {img_url}")
+                ocr_text = extract_text_from_image(img_url)
+                infos = extract_concours_info(ocr_text)
+                if infos:
+                    break
+
+        if infos and not ((df["Date"] == infos["Date"]) & (df["Heure"] == infos["Heure"])).any():
+            print("✅ Nouveau concours détecté :", infos)
+            df.loc[len(df)] = infos
+
+    # 🧹 Nettoyage + sauvegarde
     aujourd_hui = datetime.now().strftime("%Y-%m-%d")
-    if not ((df["Date"] == infos_flyer["Date"]) & (df["Heure"] == infos_flyer["Heure"])).any():
-        df = pd.concat([df, pd.DataFrame([infos_flyer])], ignore_index=True)
-        df = df[df["Date"] >= aujourd_hui]
-        df = df.sort_values(by="Date")
-        df.to_csv(csv_path, index=False)
-        print("💾 Fichier mis à jour avec le flyer.")
-###
+    df = df[df["Date"] >= aujourd_hui].sort_values(by="Date")
+    df.to_csv(csv_path, index=False)
 
+    print(f"✅ {len(df)} concours à venir enregistrés dans : {csv_path}")
 
-# 🔁 Récupération des publications du groupe Facebook
-for post in get_posts(PAGE_ID, pages=3):
-    text = post.get("text", "")
-    infos = extract_concours_info(text)
-
-    # 📸 Si rien dans le texte, essayer OCR sur les images
-    if not infos:
-        images = post.get("images", [])
-        for img_url in images:
-            print(f"Analyse OCR image : {img_url}")
-            ocr_text = extract_text_from_image(img_url)
-            infos = extract_concours_info(ocr_text)
-            if infos:
-                break
-
-    # 🆕 Ajouter si non déjà présent
-    if infos and not ((df["Date"] == infos["Date"]) & (df["Heure"] == infos["Heure"])).any():
-        print("✅ Nouveau concours détecté :", infos)
-        df = pd.concat([df, pd.DataFrame([infos])], ignore_index=True)
-
-#  Afficher le nombre de posts détectés
-posts = list(get_posts(PAGE_ID, pages=1))
-print(f"🔍 {len(posts)} publication(s) trouvée(s) dans le groupe.")
-
-
-# 🧹 Supprimer les concours passés
-aujourd_hui = datetime.now().strftime("%Y-%m-%d")
-df = df[df["Date"] >= aujourd_hui]
-
-# 📊 Trier par date croissante
-df = df.sort_values(by="Date")
-df.to_csv(csv_path, index=False)
-print("✅ Fichier mis à jour :", csv_path)
+if __name__ == "__main__":
+    main()
