@@ -7,11 +7,10 @@ import cv2
 import numpy as np
 from datetime import datetime
 from PIL import Image
-import io
+from io import BytesIO
 from facebook_scraper import get_posts
 
-flyer_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/640px-PNG_transparency_demonstration_1.png"
-
+flyer_url = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
 
 PAGE_ID = "661554949372064"
 csv_path = "concours_palet.csv"
@@ -20,7 +19,7 @@ csv_path = "concours_palet.csv"
 def extract_text_from_image(url):
     try:
         response = requests.get(url)
-        img = Image.open(io.BytesIO(response.content))
+        img = Image.open(BytesIO(response.content))
         text = pytesseract.image_to_string(img, lang='fra')
         return text
     except Exception as e:
