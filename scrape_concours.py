@@ -10,7 +10,7 @@ from PIL import Image
 import io
 from facebook_scraper import get_posts
 
-PAGE_ID = "61554949372064"
+PAGE_ID = "661554949372064"
 csv_path = "concours_palet.csv"
 
 # 🔍 OCR depuis URL d'image
