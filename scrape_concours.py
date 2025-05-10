@@ -7,23 +7,22 @@ import cv2
 import numpy as np
 from datetime import datetime
 from facebook_scraper import get_posts
+from PIL import Image
+from io import BytesIO
 
 PAGE_ID = "61554949372064"
 CSV_PATH = "concours_palet.csv"
 
-
 # 🔍 OCR depuis image URL
 def extract_text_from_image(url):
     try:
-        response = requests.get(url, stream=True)
-        img_arr = np.asarray(bytearray(response.content), dtype=np.uint8)
-        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-        text = pytesseract.image_to_string(img, lang='fra')
+        response = requests.get(url)
+        image = Image.open(BytesIO(response.content)).convert("RGB")
+        text = pytesseract.image_to_string(image, lang='fra')
         return text
     except Exception as e:
         print("Erreur OCR :", e)
         return ""
-
 
 # 📌 Extraction date, heure, lieu
 def extract_concours_info(text):
