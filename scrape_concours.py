@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from datetime import datetime
 from PIL import Image
+import io
 from facebook_scraper import get_posts
 
 PAGE_ID = "61554949372064"
@@ -15,9 +16,8 @@ csv_path = "concours_palet.csv"
 # 🔍 OCR depuis URL d'image
 def extract_text_from_image(url):
     try:
-        response = requests.get(url, stream=True)
-        img_arr = np.asarray(bytearray(response.content), dtype=np.uint8)
-        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+        response = requests.get(url)
+        img = Image.open(io.BytesIO(response.content))
         text = pytesseract.image_to_string(img, lang='fra')
         return text
     except Exception as e:
@@ -28,23 +28,45 @@ def extract_text_from_image(url):
 def extract_concours_info(text):
     infos = {}
 
-    date_match = re.search(r"(\d{1,2})\s*(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s*(20\d{2})", text, re.IGNORECASE)
-    if date_match:
-        mois_fr = {
-            "janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
-            "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12
-        }
-        jour = int(date_match.group(1))
-        mois = mois_fr[date_match.group(2).lower()]
-        annee = int(date_match.group(3))
-        infos["Date"] = datetime(annee, mois, jour).strftime("%Y-%m-%d")
+    # Dates : 17 mai, 17/05/2025, 17-05-25, etc.
+    date_patterns = [
+        r"(\d{1,2})\s*(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s*(20\d{2})?",
+        r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})"
+    ]
+    mois_fr = {
+        "janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
+        "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12
+    }
 
-    heure_match = re.search(r"(\d{1,2})h(\d{0,2})", text)
+    for pattern in date_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            try:
+                if len(match.groups()) == 3 and match.group(2).isalpha():
+                    # Format texte : 17 mai 2025
+                    jour = int(match.group(1))
+                    mois = mois_fr[match.group(2).lower()]
+                    annee = int(match.group(3)) if match.group(3) else datetime.now().year
+                else:
+                    # Format numérique : 17/05/25
+                    jour = int(match.group(1))
+                    mois = int(match.group(2))
+                    annee = int(match.group(3))
+                    if annee < 100:
+                        annee += 2000
+                infos["Date"] = datetime(annee, mois, jour).strftime("%Y-%m-%d")
+                break
+            except Exception as e:
+                print("Erreur parsing date :", e)
+
+    # Heure : 14h, 14h00, 14:00
+    heure_match = re.search(r"(\d{1,2})[:h](\d{0,2})", text)
     if heure_match:
         h = heure_match.group(1)
         m = heure_match.group(2) if heure_match.group(2) else "00"
         infos["Heure"] = f"{h}:{m}"
 
+    # Lieu : après "à" ou "lieu"
     lieu_match = re.search(r"(?:à|lieu\s*[:\-]?)\s*([A-ZÉÈÀA-Za-z\s\-']{3,})", text, re.IGNORECASE)
     if lieu_match:
         infos["Lieu"] = lieu_match.group(1).strip()
@@ -81,14 +103,18 @@ def main():
     # 🔁 Parcourir publications Facebook
     for post in get_posts(PAGE_ID, pages=3):
         text = post.get("text", "")
+        print("\n--- POST TEXTE ---\n", text)
         infos = extract_concours_info(text)
+        print("Infos trouvées dans texte :", infos)
 
         if not infos:
             images = post.get("images", [])
+            print("🔎 Images à analyser :", images)
             for img_url in images:
-                print(f"Analyse OCR image : {img_url}")
                 ocr_text = extract_text_from_image(img_url)
+                print("🧠 Texte OCR :", ocr_text)
                 infos = extract_concours_info(ocr_text)
+                print("Infos OCR extraites :", infos)
                 if infos:
                     break
 
