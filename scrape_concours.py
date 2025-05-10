@@ -6,78 +6,59 @@ import pytesseract
 import cv2
 import numpy as np
 from datetime import datetime
-from PIL import Image
-from io import BytesIO
 from facebook_scraper import get_posts
 
-flyer_url = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+PAGE_ID = "61554949372064"
+CSV_PATH = "concours_palet.csv"
 
-PAGE_ID = "661554949372064"
-csv_path = "concours_palet.csv"
 
-# 🔍 OCR depuis URL d'image
+# 🔍 OCR depuis image URL
 def extract_text_from_image(url):
     try:
-        response = requests.get(url)
-        img = Image.open(BytesIO(response.content))
+        response = requests.get(url, stream=True)
+        img_arr = np.asarray(bytearray(response.content), dtype=np.uint8)
+        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
         text = pytesseract.image_to_string(img, lang='fra')
         return text
     except Exception as e:
         print("Erreur OCR :", e)
         return ""
 
-# 📌 Extraire date/heure/lieu d'un texte
+
+# 📌 Extraction date, heure, lieu
 def extract_concours_info(text):
     infos = {}
 
-    # Dates : 17 mai, 17/05/2025, 17-05-25, etc.
-    date_patterns = [
-        r"(\d{1,2})\s*(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s*(20\d{2})?",
-        r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})"
-    ]
-    mois_fr = {
-        "janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
-        "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12
-    }
+    # Date (souple)
+    date_match = re.search(r"(\d{1,2})\s*(janv|févr|mars|avr|mai|juin|juil|août|sept|oct|nov|déc)[a-zé]*\s*(20\d{2})?", text, re.IGNORECASE)
+    if date_match:
+        mois_fr = {
+            "janv": 1, "févr": 2, "mars": 3, "avr": 4, "mai": 5, "juin": 6,
+            "juil": 7, "août": 8, "sept": 9, "oct": 10, "nov": 11, "déc": 12
+        }
+        jour = int(date_match.group(1))
+        mois = mois_fr[date_match.group(2).lower()[:4]]
+        annee = int(date_match.group(3)) if date_match.group(3) else datetime.now().year
+        infos["Date"] = datetime(annee, mois, jour).strftime("%Y-%m-%d")
 
-    for pattern in date_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            try:
-                if len(match.groups()) == 3 and match.group(2).isalpha():
-                    # Format texte : 17 mai 2025
-                    jour = int(match.group(1))
-                    mois = mois_fr[match.group(2).lower()]
-                    annee = int(match.group(3)) if match.group(3) else datetime.now().year
-                else:
-                    # Format numérique : 17/05/25
-                    jour = int(match.group(1))
-                    mois = int(match.group(2))
-                    annee = int(match.group(3))
-                    if annee < 100:
-                        annee += 2000
-                infos["Date"] = datetime(annee, mois, jour).strftime("%Y-%m-%d")
-                break
-            except Exception as e:
-                print("Erreur parsing date :", e)
-
-    # Heure : 14h, 14h00, 14:00
-    heure_match = re.search(r"(\d{1,2})[:h](\d{0,2})", text)
+    # Heure
+    heure_match = re.search(r"\b(\d{1,2})[h:](\d{0,2})\b", text)
     if heure_match:
         h = heure_match.group(1)
         m = heure_match.group(2) if heure_match.group(2) else "00"
         infos["Heure"] = f"{h}:{m}"
 
-    # Lieu : après "à" ou "lieu"
-    lieu_match = re.search(r"(?:à|lieu\s*[:\-]?)\s*([A-ZÉÈÀA-Za-z\s\-']{3,})", text, re.IGNORECASE)
+    # Lieu
+    lieu_match = re.search(r"(?:à\s+|lieu\s*[:\-]?\s*)([A-ZÉÈÀA-Za-z\s\-']{3,})", text, re.IGNORECASE)
     if lieu_match:
         infos["Lieu"] = lieu_match.group(1).strip()
 
     return infos if "Date" in infos else {}
 
-# 🧪 Test OCR sur un flyer
+
+# 🧪 Test OCR sur flyer exemple (image publique)
 def test_flyer_ocr():
-    flyer_url = "https://scontent.xx.fbcdn.net/v/t39.30808-6/441181134_2019829378544809_7314485221197299128_n.jpg"
+    flyer_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tournoi.jpg/640px-Tournoi.jpg"
     print("\n🧪 Test OCR sur flyer d'exemple...\n")
     ocr_text = extract_text_from_image(flyer_url)
     print("🧠 Texte OCR détecté :\n", ocr_text)
@@ -89,53 +70,52 @@ def test_flyer_ocr():
         print("❌ Aucune info détectée.")
         return {}
 
-# 🚀 Script principal
-def main():
-    # Charger fichier CSV
-    if os.path.exists(csv_path):
-        df = pd.read_csv(csv_path)
-    else:
-        df = pd.DataFrame(columns=["Date", "Heure", "Lieu"])
 
-    # 🧪 Test OCR
-    infos_flyer = test_flyer_ocr()
-    if infos_flyer and not ((df["Date"] == infos_flyer["Date"]) & (df["Heure"] == infos_flyer["Heure"])).any():
-        df.loc[len(df)] = infos_flyer
-
-    # 🔁 Parcourir publications Facebook
+# 🔁 Traitement des publications Facebook
+def process_facebook_posts(df):
+    count = 0
     for post in get_posts(PAGE_ID, pages=3):
         text = post.get("text", "")
-        print("\n--- POST TEXTE ---\n", text)
         infos = extract_concours_info(text)
-        print("Infos trouvées dans texte :", infos)
 
         if not infos:
             images = post.get("images", [])
-            print("🔎 Images à analyser :", images)
             for img_url in images:
+                print(f"🖼️ Analyse OCR image : {img_url}")
                 ocr_text = extract_text_from_image(img_url)
-                print("🧠 Texte OCR :", ocr_text)
                 infos = extract_concours_info(ocr_text)
-                print("Infos OCR extraites :", infos)
                 if infos:
                     break
 
         if infos and not ((df["Date"] == infos["Date"]) & (df["Heure"] == infos["Heure"])).any():
-            print("✅ Nouveau concours détecté :", infos)
             df.loc[len(df)] = infos
-       
-        print("Texte brut analysé :", text)
-        print("Infos extraites du texte :", infos)
-        print("Images trouvées :", post.get("images", []))
-        print("Infos extraites des images :", infos)
-        
-    # 🧹 Nettoyage + sauvegarde
+            count += 1
+
+    return df, count
+
+
+def main():
+    # Charger ou créer CSV
+    if os.path.exists(CSV_PATH):
+        df = pd.read_csv(CSV_PATH)
+    else:
+        df = pd.DataFrame(columns=["Date", "Heure", "Lieu"])
+
+    # OCR de test
+    infos_flyer = test_flyer_ocr()
+    if infos_flyer and not ((df["Date"] == infos_flyer["Date"]) & (df["Heure"] == infos_flyer["Heure"])).any():
+        df.loc[len(df)] = infos_flyer
+
+    # Facebook
+    df, nb_nouveaux = process_facebook_posts(df)
+
+    # Nettoyage et sauvegarde
     aujourd_hui = datetime.now().strftime("%Y-%m-%d")
     df = df[df["Date"] >= aujourd_hui].sort_values(by="Date")
-    df.to_csv(csv_path, index=False)
+    df.to_csv(CSV_PATH, index=False)
 
-   
-    print(f"✅ {len(df)} concours à venir enregistrés dans : {csv_path}")
+    print(f"\n✅ {nb_nouveaux} concours à venir enregistrés dans : {CSV_PATH}")
+
 
 if __name__ == "__main__":
     main()
