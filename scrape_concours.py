@@ -55,9 +55,9 @@ def extract_concours_info(text):
     return infos if "Date" in infos else {}
 
 
-# 🧪 Test OCR sur flyer exemple (image publique)
+# 🧪 Test OCR sur flyer exemple (image publique avec texte réel)
 def test_flyer_ocr():
-    flyer_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tournoi.jpg/640px-Tournoi.jpg"
+    flyer_url = "https://upload.wikimedia.org/wikipedia/commons/7/75/Example_of_a_Concert_Poster.jpg"  # Poster avec texte
     print("\n🧪 Test OCR sur flyer d'exemple...\n")
     ocr_text = extract_text_from_image(flyer_url)
     print("🧠 Texte OCR détecté :\n", ocr_text)
@@ -68,7 +68,6 @@ def test_flyer_ocr():
     else:
         print("❌ Aucune info détectée.")
         return {}
-
 
 # 🔁 Traitement des publications Facebook
 def process_facebook_posts(df):
