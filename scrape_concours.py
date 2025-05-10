@@ -10,6 +10,9 @@ from PIL import Image
 import io
 from facebook_scraper import get_posts
 
+flyer_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/640px-PNG_transparency_demonstration_1.png"
+
+
 PAGE_ID = "661554949372064"
 csv_path = "concours_palet.csv"
 
