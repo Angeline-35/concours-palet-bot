@@ -64,7 +64,7 @@ def extract_concours_info(text):
 
 # 🧪 Test OCR sur flyer exemple (image publique avec texte réel)
 def test_flyer_ocr():
-    https://github.com/openai-examples/test-data/raw/main/flyer_ocr_demo.jpg  # Poster avec texte
+    flyer_url = "https://github.com/openai-examples/test-data/raw/main/flyer_ocr_demo.jpg"  # Poster avec texte
     print("\n🧪 Test OCR sur flyer d'exemple...\n")
     ocr_text = extract_text_from_image(flyer_url)
     print("🧠 Texte OCR détecté :\n", ocr_text)
