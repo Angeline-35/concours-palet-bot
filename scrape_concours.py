@@ -18,6 +18,12 @@ def extract_text_from_image(url):
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers)
+
+        # 👇 Nouveau bloc pour debug
+        print(f"[DEBUG] Status code: {response.status_code}")
+        print(f"[DEBUG] Content-Type: {response.headers.get('Content-Type')}")
+        print(f"[DEBUG] Content length: {len(response.content)}")
+
         image = Image.open(BytesIO(response.content)).convert("RGB")
         text = pytesseract.image_to_string(image, lang='fra')
         return text
@@ -58,7 +64,7 @@ def extract_concours_info(text):
 
 # 🧪 Test OCR sur flyer exemple (image publique avec texte réel)
 def test_flyer_ocr():
-    flyer_url = "https://upload.wikimedia.org/wikipedia/commons/7/75/Example_of_a_Concert_Poster.jpg"  # Poster avec texte
+    flyer_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Example_of_a_simple_flyer.jpg/800px-Example_of_a_simple_flyer.jpg"  # Poster avec texte
     print("\n🧪 Test OCR sur flyer d'exemple...\n")
     ocr_text = extract_text_from_image(flyer_url)
     print("🧠 Texte OCR détecté :\n", ocr_text)
