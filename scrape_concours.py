@@ -16,7 +16,8 @@ CSV_PATH = "concours_palet.csv"
 # 🔍 OCR depuis image URL
 def extract_text_from_image(url):
     try:
-        response = requests.get(url)
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers)
         image = Image.open(BytesIO(response.content)).convert("RGB")
         text = pytesseract.image_to_string(image, lang='fra')
         return text
